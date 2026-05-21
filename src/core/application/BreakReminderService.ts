@@ -15,6 +15,7 @@ export class BreakReminderService {
   private idleTimerHandle: TimerHandle | null = null;
   private activitySession: ActivitySession | null = null;
   private breakSession: BreakSession | null = null;
+  private cycleStartedAt: number = 0;
 
   constructor(
     private readonly activityMonitor: IActivityMonitor,
@@ -39,10 +40,16 @@ export class BreakReminderService {
     return this.state;
   }
 
+  /** Milliseconds elapsed since the current WORKING or BREAK cycle began. */
+  getElapsedMs(): number {
+    return Date.now() - this.cycleStartedAt;
+  }
+
   // ── Work cycle ────────────────────────────────────────────────────────────
 
   private startWorkCycle(): void {
     this.state = TimerState.WORKING;
+    this.cycleStartedAt = Date.now();
     this.activitySession = new ActivitySession();
 
     const event = new WorkTimerStarted();
@@ -64,6 +71,7 @@ export class BreakReminderService {
 
     this.clearWorkTimer();
     this.state = TimerState.BREAK;
+    this.cycleStartedAt = Date.now();
     this.notifier.notify('Time for a break!', 'Look 20 feet away for 20 seconds.');
 
     this.breakSession = new BreakSession();

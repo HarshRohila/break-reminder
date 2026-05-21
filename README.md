@@ -144,7 +144,54 @@ Optional `config`:
 
 ---
 
-## Wiring Guide (Electron adapter, future step)
+## Dev Setup
+
+### Prerequisites
+
+- [asdf](https://asdf-vm.com/) with the `pnpm` plugin — versions are pinned in `.tool-versions`
+- macOS (tray + `powerMonitor` are tested on macOS; Windows/Linux should work but are untested)
+
+### Install
+
+```bash
+# 1. Install the pinned pnpm version
+asdf install
+
+# 2. Install dependencies (includes Electron)
+pnpm install
+
+# 3. Approve Electron's post-install build script (downloads the Electron binary)
+pnpm approve-builds   # select 'electron' with <space>, then <enter>
+pnpm install          # re-run to execute the approved script
+```
+
+### Run
+
+```bash
+pnpm dev
+```
+
+This compiles TypeScript → `dist/`, copies `index.html` to `dist/electron/renderer/`, then launches Electron. A tray icon appears in the macOS menu bar. Click it to open the status window.
+
+### Tests
+
+```bash
+pnpm test          # run all tests once (core + electron adapter)
+pnpm test:watch    # watch mode
+pnpm typecheck     # type-check only, no emit
+```
+
+### Build (compile only, no launch)
+
+```bash
+pnpm build
+```
+
+Output goes to `dist/`. Entry point: `dist/electron/main.js`.
+
+---
+
+## Wiring Guide (Electron adapter)
 
 1. Implement `IActivityMonitor` using `uiohook-napi` or similar.
 2. Implement `ITimerService` wrapping Node's `setTimeout`.
@@ -182,9 +229,25 @@ src/
       BreakReminderConfig.ts
       BreakReminderService.ts
     __tests__/
-      fakes.ts                      ← fake implementations for all ports
+      fakes.ts                            ← fake port implementations for unit tests
       Duration.test.ts
       ActivitySession.test.ts
       BreakSession.test.ts
       BreakReminderService.test.ts
+  electron/
+    adapters/
+      ElectronActivityMonitor.ts          ← IActivityMonitor via powerMonitor poll
+      NodeTimerService.ts                 ← ITimerService via globalThis.setTimeout
+      ElectronNotifier.ts                 ← INotifier via Electron Notification API
+      ConsoleLogger.ts                    ← ILogger via console
+    renderer/
+      index.html                          ← status window markup + styles
+      renderer.ts                         ← polls IPC every second, updates UI
+    __tests__/
+      ElectronActivityMonitor.test.ts
+      NodeTimerService.test.ts
+      ipcStatusHandler.test.ts
+    ipc.ts                                ← pure handleGetStatus() — no Electron dep
+    preload.ts                            ← contextBridge exposes getStatus() to renderer
+    main.ts                               ← entry point: tray + window + service wiring
 ```
