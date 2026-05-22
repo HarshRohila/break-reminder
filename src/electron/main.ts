@@ -65,8 +65,6 @@ function createStatusWindow(): BrowserWindow {
 
   void win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 
-  win.webContents.openDevTools({ mode: 'detach' });
-
   // Auto-hide on focus loss so it dismisses like a native popover
   win.on('blur', () => win.hide());
 
