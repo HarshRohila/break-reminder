@@ -5,11 +5,12 @@
   "type": "module",
   "main": "dist/electron/main.js",
   "scripts": {
-    "dev": "tsc -p tsconfig.json && cp src/electron/renderer/index.html dist/electron/renderer/ && electron dist/electron/main.js",
-    "build": "tsc -p tsconfig.json && cp src/electron/renderer/index.html dist/electron/renderer/",
+    "dev": "tsc -p tsconfig.json && cp src/electron/renderer/*.html dist/electron/renderer/ && electron dist/electron/main.js",
+    "build": "tsc -p tsconfig.json && cp src/electron/renderer/*.html dist/electron/renderer/",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

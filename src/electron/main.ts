@@ -1,12 +1,12 @@
-import { app, BrowserWindow, ipcMain, nativeImage, powerMonitor, Tray } from 'electron';
+import { app, BrowserWindow, ipcMain, nativeImage, powerMonitor, screen, Tray } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BreakReminderService } from '../core/application/BreakReminderService.js';
 import { ElectronActivityMonitor } from './adapters/ElectronActivityMonitor.js';
-import { ElectronNotifier } from './adapters/ElectronNotifier.js';
+import { ElectronBreakUiController } from './adapters/ElectronBreakUiController.js';
 import { ConsoleLogger } from './adapters/ConsoleLogger.js';
 import { NodeTimerService } from './adapters/NodeTimerService.js';
-import { handleGetStatus } from './ipc.js';
+import { handleGetStatus, handleSkipBreak } from './ipc.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -43,6 +43,7 @@ function makeTrayIcon(): Electron.NativeImage {
 
 let tray: Tray | null = null;
 let statusWindow: BrowserWindow | null = null;
+let overlayWindow: BrowserWindow | null = null;
 let service: BreakReminderService | null = null;
 
 // ── Status window ─────────────────────────────────────────────────────────────
@@ -67,6 +68,42 @@ function createStatusWindow(): BrowserWindow {
 
   // Auto-hide on focus loss so it dismisses like a native popover
   win.on('blur', () => win.hide());
+
+  return win;
+}
+
+// ── Break overlay window ──────────────────────────────────────────────────────
+
+function createOverlayWindow(): BrowserWindow {
+  const { bounds } = screen.getPrimaryDisplay();
+
+  const win = new BrowserWindow({
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
+    show: false,
+    frame: false,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    closable: false,
+    fullscreenable: true,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  // Float above full-screen apps and follow the user across spaces
+  win.setAlwaysOnTop(true, 'screen-saver');
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+
+  void win.loadFile(path.join(__dirname, 'renderer', 'overlay.html'));
 
   return win;
 }
@@ -110,14 +147,15 @@ async function bootstrap(): Promise<void> {
   app.dock?.hide();
 
   statusWindow = createStatusWindow();
+  overlayWindow = createOverlayWindow();
   tray = createTray();
 
   const monitor = new ElectronActivityMonitor(powerMonitor);
   const timer = new NodeTimerService();
-  const notifier = new ElectronNotifier();
+  const breakUi = new ElectronBreakUiController(() => overlayWindow);
   const logger = new ConsoleLogger();
 
-  service = new BreakReminderService(monitor, timer, notifier, logger);
+  service = new BreakReminderService(monitor, timer, breakUi, logger);
 
   ipcMain.handle('get-status', () =>
     service !== null
@@ -126,6 +164,10 @@ async function bootstrap(): Promise<void> {
   );
 
   ipcMain.on('quit-app', () => app.quit());
+
+  ipcMain.on('skip-break', () => {
+    if (service !== null) handleSkipBreak(service);
+  });
 
   service.start();
 }

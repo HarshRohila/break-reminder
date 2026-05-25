@@ -1,6 +1,6 @@
 import { IActivityMonitor } from '../application/ports/IActivityMonitor.js';
+import { IBreakUiController } from '../application/ports/IBreakUiController.js';
 import { ILogger } from '../application/ports/ILogger.js';
-import { INotifier } from '../application/ports/INotifier.js';
 import { ITimerService, TimerHandle } from '../application/ports/ITimerService.js';
 
 // ── FakeTimerService ──────────────────────────────────────────────────────────
@@ -73,21 +73,25 @@ export class FakeActivityMonitor implements IActivityMonitor {
   }
 }
 
-// ── FakeNotifier ──────────────────────────────────────────────────────────────
+// ── FakeBreakUiController ─────────────────────────────────────────────────────
 
-export class FakeNotifier implements INotifier {
-  readonly notifications: Array<{ title: string; body: string }> = [];
+export class FakeBreakUiController implements IBreakUiController {
+  readonly calls: Array<'show' | 'hide'> = [];
 
-  notify(title: string, body: string): void {
-    this.notifications.push({ title, body });
+  showBreakOverlay(): void {
+    this.calls.push('show');
   }
 
-  get callCount(): number {
-    return this.notifications.length;
+  hideBreakOverlay(): void {
+    this.calls.push('hide');
   }
 
-  get lastNotification(): { title: string; body: string } | undefined {
-    return this.notifications.at(-1);
+  get showCount(): number {
+    return this.calls.filter((c) => c === 'show').length;
+  }
+
+  get hideCount(): number {
+    return this.calls.filter((c) => c === 'hide').length;
   }
 }
 

@@ -4,6 +4,7 @@ interface BreakReminderWindow extends Window {
   breakReminder: {
     getStatus(): Promise<StatusResponse>;
     quit(): void;
+    skipBreak(): void;
   };
 }
 

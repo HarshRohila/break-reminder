@@ -16,3 +16,11 @@ export function handleGetStatus(service: BreakReminderService): StatusResponse {
     elapsedMs: service.getElapsedMs(),
   };
 }
+
+/**
+ * Pure handler function — no Electron imports, fully testable.
+ * Register in main.ts: ipcMain.on('skip-break', () => handleSkipBreak(service))
+ */
+export function handleSkipBreak(service: BreakReminderService): void {
+  service.skipBreak();
+}

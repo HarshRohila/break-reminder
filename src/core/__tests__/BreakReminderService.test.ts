@@ -3,9 +3,13 @@ import { BreakReminderService } from '../application/BreakReminderService.js';
 import { BreakReminderConfig } from '../application/BreakReminderConfig.js';
 import { Duration } from '../domain/value-objects/Duration.js';
 import { TimerState } from '../domain/value-objects/TimerState.js';
-import { FakeActivityMonitor, FakeLogger, FakeNotifier, FakeTimerService } from './fakes.js';
+import {
+  FakeActivityMonitor,
+  FakeBreakUiController,
+  FakeLogger,
+  FakeTimerService,
+} from './fakes.js';
 
-// Use small durations so tests read clearly without magic numbers
 const TEST_CONFIG: BreakReminderConfig = {
   workDuration: Duration.of(1_000),
   breakIdleThreshold: Duration.of(200),
@@ -15,10 +19,10 @@ const TEST_CONFIG: BreakReminderConfig = {
 function makeService() {
   const timer = new FakeTimerService();
   const monitor = new FakeActivityMonitor();
-  const notifier = new FakeNotifier();
+  const breakUi = new FakeBreakUiController();
   const logger = new FakeLogger();
-  const service = new BreakReminderService(monitor, timer, notifier, logger, TEST_CONFIG);
-  return { timer, monitor, notifier, logger, service };
+  const service = new BreakReminderService(monitor, timer, breakUi, logger, TEST_CONFIG);
+  return { timer, monitor, breakUi, logger, service };
 }
 
 describe('BreakReminderService', () => {
@@ -38,9 +42,14 @@ describe('BreakReminderService', () => {
     it('schedules work timer and natural-break idle timer on start', () => {
       const { service, timer } = makeService();
       service.start();
-      // work timer (1000ms) + natural-break idle timer (500ms)
       expect(timer.pendingMs).toEqual(expect.arrayContaining([1_000, 500]));
       expect(timer.pendingCount).toBe(2);
+    });
+
+    it('does not show the overlay on start', () => {
+      const { service, breakUi } = makeService();
+      service.start();
+      expect(breakUi.showCount).toBe(0);
     });
   });
 
@@ -57,31 +66,34 @@ describe('BreakReminderService', () => {
       expect(ctx.service.getState()).toBe(TimerState.BREAK);
     });
 
-    it('sends a notification when work timer fires', () => {
+    it('shows the break overlay when work timer fires', () => {
       ctx.timer.triggerByMs(TEST_CONFIG.workDuration.ms);
-      expect(ctx.notifier.callCount).toBe(1);
-      expect(ctx.notifier.lastNotification?.title).toBe('Time for a break!');
+      expect(ctx.breakUi.showCount).toBe(1);
     });
 
     it('replaces the natural-break idle timer with a break-idle timer', () => {
       ctx.timer.triggerByMs(TEST_CONFIG.workDuration.ms);
-      // only the break idle timer (200ms) should remain — work timer consumed itself
       expect(ctx.timer.pendingMs).toEqual([TEST_CONFIG.breakIdleThreshold.ms]);
     });
   });
 
-  describe('break completion', () => {
+  describe('break completion via 20s idle', () => {
     let ctx: ReturnType<typeof makeService>;
 
     beforeEach(() => {
       ctx = makeService();
       ctx.service.start();
-      ctx.timer.triggerByMs(TEST_CONFIG.workDuration.ms); // enter BREAK
+      ctx.timer.triggerByMs(TEST_CONFIG.workDuration.ms);
     });
 
-    it('returns to WORKING after 20s consecutive idle during break', () => {
+    it('returns to WORKING after consecutive idle during break', () => {
       ctx.timer.triggerByMs(TEST_CONFIG.breakIdleThreshold.ms);
       expect(ctx.service.getState()).toBe(TimerState.WORKING);
+    });
+
+    it('hides the overlay when break completes naturally', () => {
+      ctx.timer.triggerByMs(TEST_CONFIG.breakIdleThreshold.ms);
+      expect(ctx.breakUi.hideCount).toBe(1);
     });
 
     it('restarts work and natural-break timers after break completes', () => {
@@ -91,9 +103,58 @@ describe('BreakReminderService', () => {
       );
     });
 
-    it('sends only one notification per work cycle', () => {
+    it('shows overlay only once per work cycle', () => {
       ctx.timer.triggerByMs(TEST_CONFIG.breakIdleThreshold.ms);
-      expect(ctx.notifier.callCount).toBe(1);
+      expect(ctx.breakUi.showCount).toBe(1);
+    });
+  });
+
+  describe('skipBreak()', () => {
+    let ctx: ReturnType<typeof makeService>;
+
+    beforeEach(() => {
+      ctx = makeService();
+      ctx.service.start();
+    });
+
+    it('is a no-op while in WORKING state', () => {
+      const beforeMs = [...ctx.timer.pendingMs].sort((a, b) => a - b);
+      ctx.service.skipBreak();
+      expect(ctx.service.getState()).toBe(TimerState.WORKING);
+      expect(ctx.breakUi.hideCount).toBe(0);
+      expect([...ctx.timer.pendingMs].sort((a, b) => a - b)).toEqual(beforeMs);
+    });
+
+    it('returns to WORKING immediately when called during BREAK', () => {
+      ctx.timer.triggerByMs(TEST_CONFIG.workDuration.ms);
+      ctx.service.skipBreak();
+      expect(ctx.service.getState()).toBe(TimerState.WORKING);
+    });
+
+    it('hides the overlay when called during BREAK', () => {
+      ctx.timer.triggerByMs(TEST_CONFIG.workDuration.ms);
+      ctx.service.skipBreak();
+      expect(ctx.breakUi.hideCount).toBe(1);
+    });
+
+    it('restarts the full work cycle (work + natural-break timers) after skip', () => {
+      ctx.timer.triggerByMs(TEST_CONFIG.workDuration.ms);
+      ctx.service.skipBreak();
+      expect(ctx.timer.pendingMs).toEqual(
+        expect.arrayContaining([
+          TEST_CONFIG.workDuration.ms,
+          TEST_CONFIG.naturalBreakThreshold.ms,
+        ]),
+      );
+    });
+
+    it('a second skipBreak() during the new WORKING cycle is a no-op', () => {
+      ctx.timer.triggerByMs(TEST_CONFIG.workDuration.ms);
+      ctx.service.skipBreak();
+      const beforeMs = [...ctx.timer.pendingMs].sort((a, b) => a - b);
+      ctx.service.skipBreak();
+      expect(ctx.service.getState()).toBe(TimerState.WORKING);
+      expect([...ctx.timer.pendingMs].sort((a, b) => a - b)).toEqual(beforeMs);
     });
   });
 
@@ -103,7 +164,7 @@ describe('BreakReminderService', () => {
     beforeEach(() => {
       ctx = makeService();
       ctx.service.start();
-      ctx.timer.triggerByMs(TEST_CONFIG.workDuration.ms); // enter BREAK
+      ctx.timer.triggerByMs(TEST_CONFIG.workDuration.ms);
     });
 
     it('still has one idle timer after activity during break', () => {
@@ -146,14 +207,13 @@ describe('BreakReminderService', () => {
       );
     });
 
-    it('does not send a notification for a natural break', () => {
+    it('does not show the overlay on a natural break', () => {
       ctx.timer.triggerByMs(TEST_CONFIG.naturalBreakThreshold.ms);
-      expect(ctx.notifier.callCount).toBe(0);
+      expect(ctx.breakUi.showCount).toBe(0);
     });
 
     it('activity during WORKING resets the natural-break idle timer', () => {
       ctx.monitor.triggerActivity();
-      // idle timer was replaced; triggering it still results in natural break, not crash
       ctx.timer.triggerByMs(TEST_CONFIG.naturalBreakThreshold.ms);
       expect(ctx.service.getState()).toBe(TimerState.WORKING);
     });

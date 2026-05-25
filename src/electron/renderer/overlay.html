@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'unsafe-inline'; script-src 'self'"
+    />
+    <title>Take a break</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: #11111b;
+        color: #cdd6f4;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        user-select: none;
+        cursor: default;
+      }
+
+      .panel {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 32px;
+        text-align: center;
+        padding: 40px;
+      }
+
+      .eyebrow {
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: #fab387;
+      }
+
+      h1 {
+        font-size: 64px;
+        font-weight: 700;
+        line-height: 1.1;
+        color: #cdd6f4;
+      }
+
+      p {
+        font-size: 20px;
+        color: #a6adc8;
+        max-width: 640px;
+        line-height: 1.5;
+      }
+
+      #skip-btn {
+        margin-top: 16px;
+        background: transparent;
+        border: 1px solid #45475a;
+        color: #a6adc8;
+        font-size: 14px;
+        font-weight: 500;
+        padding: 10px 24px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: color 0.15s, border-color 0.15s, background 0.15s;
+      }
+
+      #skip-btn:hover {
+        color: #cdd6f4;
+        border-color: #6c7086;
+        background: rgba(255, 255, 255, 0.04);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="panel">
+      <div class="eyebrow">Time for a break</div>
+      <h1>Look 20 feet away</h1>
+      <p>Rest your eyes for 20 seconds. The overlay will close automatically when you stop using your computer.</p>
+      <button id="skip-btn">Skip break</button>
+    </div>
+    <script type="module" src="overlay.js"></script>
+  </body>
+</html>

@@ -5,8 +5,8 @@ import { WorkTimerStarted } from '../domain/events/WorkTimerStarted.js';
 import { TimerState } from '../domain/value-objects/TimerState.js';
 import { BreakReminderConfig, DEFAULT_CONFIG } from './BreakReminderConfig.js';
 import { IActivityMonitor } from './ports/IActivityMonitor.js';
+import { IBreakUiController } from './ports/IBreakUiController.js';
 import { ILogger } from './ports/ILogger.js';
-import { INotifier } from './ports/INotifier.js';
 import { ITimerService, TimerHandle } from './ports/ITimerService.js';
 
 export class BreakReminderService {
@@ -20,7 +20,7 @@ export class BreakReminderService {
   constructor(
     private readonly activityMonitor: IActivityMonitor,
     private readonly timerService: ITimerService,
-    private readonly notifier: INotifier,
+    private readonly breakUi: IBreakUiController,
     private readonly logger: ILogger,
     private readonly config: BreakReminderConfig = DEFAULT_CONFIG,
   ) {}
@@ -72,10 +72,20 @@ export class BreakReminderService {
     this.clearWorkTimer();
     this.state = TimerState.BREAK;
     this.cycleStartedAt = Date.now();
-    this.notifier.notify('Time for a break!', 'Look 20 feet away for 20 seconds.');
+    this.breakUi.showBreakOverlay();
 
     this.breakSession = new BreakSession();
     this.resetIdleTimer();
+  }
+
+  /**
+   * User-initiated break dismissal. Hides the overlay and resets the work cycle
+   * exactly as if the break had completed naturally (20s idle).
+   * No-op when not currently on a break.
+   */
+  skipBreak(): void {
+    if (this.state !== TimerState.BREAK) return;
+    this.handleBreakIdleComplete();
   }
 
   // ── Natural break (idle during WORKING) ───────────────────────────────────
@@ -97,6 +107,7 @@ export class BreakReminderService {
     this.logger.info('Break completed — restarting work cycle', { occurredAt: event.occurredAt });
 
     this.breakSession = null;
+    this.breakUi.hideBreakOverlay();
     this.startWorkCycle();
   }
 
