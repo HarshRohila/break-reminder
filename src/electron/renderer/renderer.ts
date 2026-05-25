@@ -3,6 +3,7 @@ import type { StatusResponse } from '../ipc.js';
 interface BreakReminderWindow extends Window {
   breakReminder: {
     getStatus(): Promise<StatusResponse>;
+    quit(): void;
   };
 }
 
@@ -42,7 +43,7 @@ async function refresh(): Promise<void> {
 }
 
 document.getElementById('quit-btn')?.addEventListener('click', () => {
-  window.close();
+  window.breakReminder.quit();
 });
 
 void refresh();

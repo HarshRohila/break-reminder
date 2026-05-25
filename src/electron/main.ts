@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, nativeImage, powerMonitor, Tray, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, nativeImage, powerMonitor, Tray } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { BreakReminderService } from '../core/application/BreakReminderService.js';
@@ -96,16 +96,6 @@ function createTray(): Tray {
   const t = new Tray(makeTrayIcon());
   t.setToolTip('Break Reminder');
 
-  const contextMenu = Menu.buildFromTemplate([
-    {
-      label: 'Show Status',
-      click: () => statusWindow && toggleWindow(statusWindow),
-    },
-    { type: 'separator' },
-    { label: 'Quit', role: 'quit' },
-  ]);
-
-  t.setContextMenu(contextMenu);
   t.on('click', () => statusWindow && toggleWindow(statusWindow));
 
   return t;
@@ -134,6 +124,8 @@ async function bootstrap(): Promise<void> {
       ? handleGetStatus(service)
       : { state: 'WORKING' as const, elapsedMs: 0 },
   );
+
+  ipcMain.on('quit-app', () => app.quit());
 
   service.start();
 }
