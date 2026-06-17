@@ -1,5 +1,5 @@
-import { BreakReminderService } from '../core/application/BreakReminderService.js';
-import { TimerState } from '../core/domain/value-objects/TimerState.js';
+import { BreakReminderService } from "../core/application/BreakReminderService.js";
+import { TimerState } from "../core/domain/value-objects/TimerState.js";
 
 export interface StatusResponse {
   state: TimerState;
@@ -17,10 +17,6 @@ export function handleGetStatus(service: BreakReminderService): StatusResponse {
   };
 }
 
-/**
- * Pure handler function — no Electron imports, fully testable.
- * Register in main.ts: ipcMain.on('skip-break', () => handleSkipBreak(service))
- */
-export function handleSkipBreak(service: BreakReminderService): void {
-  service.skipBreak();
+export function handleCompleteBreak(service: BreakReminderService): void {
+  service.completeBreak();
 }

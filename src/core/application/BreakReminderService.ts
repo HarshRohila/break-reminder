@@ -1,13 +1,14 @@
-import { ActivitySession } from '../domain/entities/ActivitySession.js';
-import { BreakSession } from '../domain/entities/BreakSession.js';
-import { NaturalBreakDetected } from '../domain/events/NaturalBreakDetected.js';
-import { WorkTimerStarted } from '../domain/events/WorkTimerStarted.js';
-import { TimerState } from '../domain/value-objects/TimerState.js';
-import { BreakReminderConfig, DEFAULT_CONFIG } from './BreakReminderConfig.js';
-import { IActivityMonitor } from './ports/IActivityMonitor.js';
-import { IBreakUiController } from './ports/IBreakUiController.js';
-import { ILogger } from './ports/ILogger.js';
-import { ITimerService, TimerHandle } from './ports/ITimerService.js';
+import { ActivitySession } from "../domain/entities/ActivitySession.js";
+import { BreakSession } from "../domain/entities/BreakSession.js";
+import { DomainEvent } from "../domain/events/DomainEvent.js";
+import { NaturalBreakDetected } from "../domain/events/NaturalBreakDetected.js";
+import { WorkTimerStarted } from "../domain/events/WorkTimerStarted.js";
+import { TimerState } from "../domain/value-objects/TimerState.js";
+import { BreakReminderConfig, DEFAULT_CONFIG } from "./BreakReminderConfig.js";
+import { IActivityMonitor } from "./ports/IActivityMonitor.js";
+import { IBreakUiController } from "./ports/IBreakUiController.js";
+import { ILogger } from "./ports/ILogger.js";
+import { ITimerService, TimerHandle } from "./ports/ITimerService.js";
 
 export class BreakReminderService {
   private state: TimerState = TimerState.WORKING;
@@ -22,7 +23,7 @@ export class BreakReminderService {
     private readonly timerService: ITimerService,
     private readonly breakUi: IBreakUiController,
     private readonly logger: ILogger,
-    private readonly config: BreakReminderConfig = DEFAULT_CONFIG,
+    private readonly config: BreakReminderConfig = DEFAULT_CONFIG
   ) {}
 
   start(): void {
@@ -53,21 +54,27 @@ export class BreakReminderService {
     this.activitySession = new ActivitySession();
 
     const event = new WorkTimerStarted();
-    this.logger.info('Work cycle started', { occurredAt: event.occurredAt });
+    this.logEventDateTime("Work cycle started", event);
 
     this.workTimerHandle = this.timerService.setTimeout(
       () => this.handleWorkTimerExpired(),
-      this.config.workDuration.ms,
+      this.config.workDuration.ms
     );
 
     this.resetIdleTimer();
+  }
+
+  private logEventDateTime(label: string, event: DomainEvent) {
+    this.logger.info(label, {
+      occurredAt: event.occurredAt.toLocaleString(),
+    });
   }
 
   private handleWorkTimerExpired(): void {
     if (this.activitySession === null || !this.activitySession.isActive) return;
 
     const event = this.activitySession.expire();
-    this.logger.info('Work timer expired — break started', { occurredAt: event.occurredAt });
+    this.logEventDateTime("Work timer expired — break started", event);
 
     this.clearWorkTimer();
     this.state = TimerState.BREAK;
@@ -83,8 +90,7 @@ export class BreakReminderService {
    * exactly as if the break had completed naturally (20s idle).
    * No-op when not currently on a break.
    */
-  skipBreak(): void {
-    if (this.state !== TimerState.BREAK) return;
+  completeBreak(): void {
     this.handleBreakIdleComplete();
   }
 
@@ -92,7 +98,10 @@ export class BreakReminderService {
 
   private handleNaturalBreak(): void {
     const event = new NaturalBreakDetected();
-    this.logger.info('Natural break detected — resetting work cycle', { occurredAt: event.occurredAt });
+    this.logEventDateTime(
+      "Natural break detected — resetting work cycle",
+      event
+    );
 
     this.clearWorkTimer();
     this.startWorkCycle();
@@ -104,7 +113,7 @@ export class BreakReminderService {
     if (this.breakSession === null || !this.breakSession.isActive) return;
 
     const event = this.breakSession.complete();
-    this.logger.info('Break completed — restarting work cycle', { occurredAt: event.occurredAt });
+    this.logEventDateTime("Break completed — restarting work cycle", event);
 
     this.breakSession = null;
     this.breakUi.hideBreakOverlay();
@@ -134,12 +143,7 @@ export class BreakReminderService {
     if (this.state === TimerState.WORKING) {
       this.idleTimerHandle = this.timerService.setTimeout(
         () => this.handleNaturalBreak(),
-        this.config.naturalBreakThreshold.ms,
-      );
-    } else {
-      this.idleTimerHandle = this.timerService.setTimeout(
-        () => this.handleBreakIdleComplete(),
-        this.config.breakIdleThreshold.ms,
+        this.config.naturalBreakThreshold.ms
       );
     }
   }

@@ -1,7 +1,7 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer } from "electron";
 
-contextBridge.exposeInMainWorld('breakReminder', {
-  getStatus: (): Promise<unknown> => ipcRenderer.invoke('get-status'),
-  quit: (): void => ipcRenderer.send('quit-app'),
-  skipBreak: (): void => ipcRenderer.send('skip-break'),
+contextBridge.exposeInMainWorld("breakReminder", {
+  getStatus: (): Promise<unknown> => ipcRenderer.invoke("get-status"),
+  quit: (): void => ipcRenderer.send("quit-app"),
+  completeBreak: (): void => ipcRenderer.send("complete-break"),
 });

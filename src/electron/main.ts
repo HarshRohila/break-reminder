@@ -1,12 +1,20 @@
-import { app, BrowserWindow, ipcMain, nativeImage, powerMonitor, screen, Tray } from 'electron';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { BreakReminderService } from '../core/application/BreakReminderService.js';
-import { ElectronActivityMonitor } from './adapters/ElectronActivityMonitor.js';
-import { ElectronBreakUiController } from './adapters/ElectronBreakUiController.js';
-import { ConsoleLogger } from './adapters/ConsoleLogger.js';
-import { NodeTimerService } from './adapters/NodeTimerService.js';
-import { handleGetStatus, handleSkipBreak } from './ipc.js';
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  nativeImage,
+  powerMonitor,
+  screen,
+  Tray,
+} from "electron";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { BreakReminderService } from "../core/application/BreakReminderService.js";
+import { ElectronActivityMonitor } from "./adapters/ElectronActivityMonitor.js";
+import { ElectronBreakUiController } from "./adapters/ElectronBreakUiController.js";
+import { ConsoleLogger } from "./adapters/ConsoleLogger.js";
+import { NodeTimerService } from "./adapters/NodeTimerService.js";
+import { handleGetStatus, handleCompleteBreak } from "./ipc.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -26,14 +34,18 @@ function makeTrayIcon(): Electron.NativeImage {
       const dy = y - cy;
       const inside = dx * dx + dy * dy <= radius * radius;
       const idx = (y * width + x) * 4;
-      buffer[idx] = 255;              // R
-      buffer[idx + 1] = 255;          // G
-      buffer[idx + 2] = 255;          // B
+      buffer[idx] = 255; // R
+      buffer[idx + 1] = 255; // G
+      buffer[idx + 2] = 255; // B
       buffer[idx + 3] = inside ? 255 : 0; // A — transparent outside circle
     }
   }
 
-  const icon = nativeImage.createFromBitmap(buffer, { width, height, scaleFactor: 1.0 });
+  const icon = nativeImage.createFromBitmap(buffer, {
+    width,
+    height,
+    scaleFactor: 1.0,
+  });
   // Template image: macOS renders it correctly for both light and dark menu bars
   icon.setTemplateImage(true);
   return icon;
@@ -58,16 +70,16 @@ function createStatusWindow(): BrowserWindow {
     alwaysOnTop: true,
     skipTaskbar: true,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.cjs'),
+      preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
 
-  void win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  void win.loadFile(path.join(__dirname, "renderer", "index.html"));
 
   // Auto-hide on focus loss so it dismisses like a native popover
-  win.on('blur', () => win.hide());
+  win.on("blur", () => win.hide());
 
   return win;
 }
@@ -93,17 +105,17 @@ function createOverlayWindow(): BrowserWindow {
     skipTaskbar: true,
     alwaysOnTop: true,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.cjs'),
+      preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
 
   // Float above full-screen apps and follow the user across spaces
-  win.setAlwaysOnTop(true, 'screen-saver');
+  win.setAlwaysOnTop(true, "screen-saver");
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
-  void win.loadFile(path.join(__dirname, 'renderer', 'overlay.html'));
+  void win.loadFile(path.join(__dirname, "renderer", "overlay.html"));
 
   return win;
 }
@@ -119,7 +131,7 @@ function toggleWindow(win: BrowserWindow): void {
   if (bounds) {
     win.setPosition(
       Math.round(bounds.x + bounds.width / 2 - 150),
-      Math.round(bounds.y + bounds.height + 4),
+      Math.round(bounds.y + bounds.height + 4)
     );
   }
 
@@ -131,9 +143,9 @@ function toggleWindow(win: BrowserWindow): void {
 
 function createTray(): Tray {
   const t = new Tray(makeTrayIcon());
-  t.setToolTip('Break Reminder');
+  t.setToolTip("Break Reminder");
 
-  t.on('click', () => statusWindow && toggleWindow(statusWindow));
+  t.on("click", () => statusWindow && toggleWindow(statusWindow));
 
   return t;
 }
@@ -157,16 +169,16 @@ async function bootstrap(): Promise<void> {
 
   service = new BreakReminderService(monitor, timer, breakUi, logger);
 
-  ipcMain.handle('get-status', () =>
+  ipcMain.handle("get-status", () =>
     service !== null
       ? handleGetStatus(service)
-      : { state: 'WORKING' as const, elapsedMs: 0 },
+      : { state: "WORKING" as const, elapsedMs: 0 }
   );
 
-  ipcMain.on('quit-app', () => app.quit());
+  ipcMain.on("quit-app", () => app.quit());
 
-  ipcMain.on('skip-break', () => {
-    if (service !== null) handleSkipBreak(service);
+  ipcMain.on("complete-break", () => {
+    if (service !== null) handleCompleteBreak(service);
   });
 
   service.start();
@@ -175,8 +187,8 @@ async function bootstrap(): Promise<void> {
 void bootstrap();
 
 // Intentionally empty — the tray keeps the app alive without any open windows
-app.on('window-all-closed', () => {});
+app.on("window-all-closed", () => {});
 
-app.on('before-quit', () => {
+app.on("before-quit", () => {
   service?.stop();
 });
